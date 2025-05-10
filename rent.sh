@@ -328,56 +328,67 @@ convert_scientific_notation() {
 }
 
 show_stats() {
-    echo "当前流量使用情况（包含IPv4/IPv6）："
+    echo -e "\033[1;36m当前流量使用情况（包含 IPv4 / IPv6 ）\033[0m"
+    echo
 
     while IFS=$' \t' read -r port_range limit reset_day _extra || [[ -n "$port_range" ]]; do
+        # 去除末尾回车符，避免因 Windows 格式出错
         port_range=${port_range%$'\r'}
         limit=${limit%$'\r'}
         reset_day=${reset_day%$'\r'}
 
+        # 跳过注释或空行
         [[ "$port_range" =~ ^[[:space:]]*# || -z "$port_range" ]] && continue
 
+        # 参数数量检查
         if [[ -z "$limit" || -z "$reset_day" || -n "$_extra" ]]; then
-            echo " [ERROR] 无效配置行: $port_range $limit $reset_day" >&2
+            echo -e "\033[1;31m[ERROR]\033[0m 无效配置行: $port_range $limit $reset_day" >&2
             continue
         fi
 
+        # 构造用于 grep 的端口匹配表达式
         regex_part=$(echo "$port_range" | sed 's/,/|/g' | sed 's/-/:/')
 
-        ipv4_in=$( $IPTABLES_PATH -L PORT_IN -nvx | grep -E "(dports)[[:space:]]+${regex_part}\\b" | awk '{sum+=$2} END{print sum}' )
-        ipv4_out=$( $IPTABLES_PATH -L PORT_OUT -nvx | grep -E "(sports)[[:space:]]+${regex_part}\\b" | awk '{sum+=$2} END{print sum}' )
+        # 收集 IPv4/IPv6 的进出流量
+        ipv4_in=$($IPTABLES_PATH -L PORT_IN -nvx | grep -E "dports[[:space:]]+(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
+        ipv4_out=$($IPTABLES_PATH -L PORT_OUT -nvx | grep -E "sports[[:space:]]+(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
+        ipv6_in=$($IP6TABLES_PATH -L PORT_IN -nvx | grep -E "dports[[:space:]]+(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
+        ipv6_out=$($IP6TABLES_PATH -L PORT_OUT -nvx | grep -E "sports[[:space:]]+(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
 
-        ipv6_in=$( $IP6TABLES_PATH -L PORT_IN -nvx | grep -E "(dports)[[:space:]]+${regex_part}\\b" | awk '{sum+=$2} END{print sum}' )
-        ipv6_out=$( $IP6TABLES_PATH -L PORT_OUT -nvx | grep -E "(sports)[[:space:]]+${regex_part}\\b" | awk '{sum+=$2} END{print sum}' )
-
+        # 默认值设定，防止空值
         ipv4_in=${ipv4_in:-0}
         ipv4_out=${ipv4_out:-0}
         ipv6_in=${ipv6_in:-0}
         ipv6_out=${ipv6_out:-0}
 
+        # 科学记数法转换（需你自己定义 convert_scientific_notation 函数）
         ipv4_in=$(convert_scientific_notation "$ipv4_in")
         ipv4_out=$(convert_scientific_notation "$ipv4_out")
         ipv6_in=$(convert_scientific_notation "$ipv6_in")
         ipv6_out=$(convert_scientific_notation "$ipv6_out")
 
+        # 总流量计算并转为 GiB
         total_bytes=$(( ipv4_in + ipv4_out + ipv6_in + ipv6_out ))
         total_gb=$(printf "%.2f" "$(echo "scale=2; $total_bytes/1024/1024/1024" | bc)")
 
+        # 判断状态是否为已暂停
         ipv4_rules=$($IPTABLES_PATH -L PORT_IN -n)
         ipv6_rules=$($IP6TABLES_PATH -L PORT_IN -n)
         status="正常"
-        if echo "$ipv4_rules $ipv6_rules" | grep -qE "DROP.*multiport.*($regex_part)"; then
+        if echo "$ipv4_rules $ipv6_rules" | grep -qE "DROP.*multiport.*(${regex_part})"; then
             status="已暂停"
         fi
 
-        echo "端口范围 $port_range:"
-        echo "  当前使用：$total_gb GiB"
-        echo "  本月限制：$limit GiB"
-        echo "  重置日期：每月 $reset_day 日"
-        echo "  当前状态：$status"
-        echo "-------------------"
+        # 输出格式美化
+        echo -e "\033[1;33m端口范围：\033[0m$port_range"
+        echo -e "  📊 当前使用：\033[1;32m$total_gb GiB\033[0m"
+        echo -e "  📈 本月限制：$limit GiB"
+        echo -e "  📅 重置日期：每月 $reset_day 日"
+        echo -e "  🚦 当前状态：\033[1;34m$status\033[0m"
+        echo -e "  ────────────────────────────────"
     done < <(grep -vE '^[[:space:]]*#|^$' "$CONFIG_FILE")
 }
+
 
 save_remaining_limits() {
     local temp_config_file=$(mktemp)
@@ -861,33 +872,35 @@ uninstall_rent() {
 }
 
 show_usage() {
-    echo -e "\033[1;38;5;208m────────────────────────────────────────────────\033[0m"
-    echo -e "\033[1;38;5;118m脚本名称 » \033[0m \033[38;5;183m$SCRIPT_NAME\033[0m"
-    echo -e "\033[1;38;5;118m当前版本 » \033[0m \033[1;38;5;45m$SCRIPT_VERSION\033[0m"
-    echo -e "\033[1;38;5;118m开发作者 » \033[0m \033[38;5;210m$SCRIPT_AUTHOR\033[0m"
-    echo -e "\033[1;38;5;208m────────────────────────────────────────────────\033[0m"
-    echo ""
+    echo -e "\033[1;32m用法：\033[0m sudo rent.sh \033[1m<命令选项>\033[0m [参数...]"
+    echo -e "      （无参数进入交互模式）"
+    echo
 
-    cat <<-EOF
-	使用方法: sudo rent.sh {命令选项} [其他]——无参数进入交互
+    echo -e "\033[1;32m命令选项：\033[0m"
+    printf "  %-10s %s\n" "start"      "启动 Rent-PL 服务"
+    printf "  %-10s %s\n" "stop"       "终止 Rent-PL 服务"
+    printf "  %-10s %s\n" "restart"    "重启 Rent-PL 服务"
+    printf "  %-10s %s\n" "init"       "初始化或重置 Rent-PL 服务"
+    echo
 
-	命令选项:
-	  stop                     终止Rent-PL服务
-	  start                    启动Rent-PL服务
-	  restart                  重启Rent-PL服务
-	  init                     重置/初始化Rent-PL服务
-	  web    <WEB参数>         管理网页服务
-	  add    <端口范围> <日期> 添加新的端口组
-	  del    <端口范围>        删除指定端口组
-	  reset  <端口范围>        重置指定端口组流量—手动
-	  status                   显示流量使用情况
-	  log                      输出日志
-	  check                    流量超限审查—手动
-	  update                   更新脚本
-	  dev                      更新开发版脚本
-	  uninstall                卸载脚本
-	EOF
+    printf "  %-10s %s\n" "web"        "配置 Web 管理服务（需附参数）"
+    printf "  %-10s %s\n" "add"        "添加端口组：add <端口范围> <重置日>"
+    printf "  %-10s %s\n" "del"        "删除端口组：del <端口范围>"
+    printf "  %-10s %s\n" "reset"      "手动重置指定端口组流量"
+    echo
+
+    printf "  %-10s %s\n" "status"     "显示当前流量使用情况"
+    printf "  %-10s %s\n" "log"        "输出最近日志记录"
+    printf "  %-10s %s\n" "check"      "手动执行一次流量超限审查"
+    echo
+
+    printf "  %-10s %s\n" "update"     "更新到最新稳定版脚本"
+    printf "  %-10s %s\n" "dev"        "更新到最新开发版脚本"
+    printf "  %-10s %s\n" "uninstall"  "卸载 Rent-PL 脚本及配置"
+    echo
 }
+
+
 
 show_usage_web() {
     cat <<-EOF
