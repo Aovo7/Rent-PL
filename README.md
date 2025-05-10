@@ -27,7 +27,7 @@ sudo apt install iptables bc python3 wget nano openssl
 
 ****2. 下载并启动脚本****
 ```
-wget -q https://raw.githubusercontent.com/BlackSheep-cry/Rent-PL/main/rent.sh -O /usr/local/bin/rent.sh && chmod +x /usr/local/bin/rent.sh && rent.sh set
+wget -q https://raw.githubusercontent.com/Aovo7/Rent-PL/refs/heads/main/rent.sh -O /usr/local/bin/rent.sh && chmod +x /usr/local/bin/rent.sh && rent.sh set
 ```
 
 ****3. 端口配置模板****
