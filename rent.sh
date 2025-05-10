@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-ln -sf ~/rent.sh /usr/local/bin/rent
+#ln -sf ~/rent.sh /usr/local/bin/rent
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 [[ $EUID -ne 0 ]] && echo "[ERROR] 请以root用户或sudo运行此脚本！" && exit 1
