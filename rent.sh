@@ -288,12 +288,15 @@ save_traffic_usage() {
         local regex_part in_bytes out_bytes total_bytes limit_bytes
         regex_part=$(echo "$port_range" | sed 's/,/|/g; s/-/:/')
 
+
         in_bytes=$(echo "$iptables_output" \
-            | grep -E "dports[[:space:]]+($regex_part)\\>" \
+            | grep -E "(dpt:|dports[[:space:]]+)(${regex_part})\\b" \
             | awk '{sum+=$2} END{print sum+0}')
         out_bytes=$(echo "$iptables_output" \
-            | grep -E "sports[[:space:]]+($regex_part)\\>" \
+            | grep -E "(spt:|sports[[:space:]]+)(${regex_part})\\b" \
             | awk '{sum+=$2} END{print sum+0}')
+
+
         in_bytes=$(convert_scientific_notation "${in_bytes:-0}")
         out_bytes=$(convert_scientific_notation "${out_bytes:-0}")
         total_bytes=$((in_bytes + out_bytes))
@@ -350,10 +353,10 @@ show_stats() {
         regex_part=$(echo "$port_range" | sed 's/,/|/g' | sed 's/-/:/')
 
         # 收集 IPv4/IPv6 的进出流量
-        ipv4_in=$($IPTABLES_PATH -L PORT_IN -nvx | grep -E "dports[[:space:]]+(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
-        ipv4_out=$($IPTABLES_PATH -L PORT_OUT -nvx | grep -E "sports[[:space:]]+(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
-        ipv6_in=$($IP6TABLES_PATH -L PORT_IN -nvx | grep -E "dports[[:space:]]+(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
-        ipv6_out=$($IP6TABLES_PATH -L PORT_OUT -nvx | grep -E "sports[[:space:]]+(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
+        ipv4_in=$($IPTABLES_PATH -L PORT_IN -nvx | grep -E "(dpt:|dports[[:space:]]+)(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
+        ipv4_out=$($IPTABLES_PATH -L PORT_OUT -nvx | grep -E "(spt:|sports[[:space:]]+)(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
+        ipv6_in=$($IP6TABLES_PATH -L PORT_IN -nvx | grep -E "(dpt:|dports[[:space:]]+)(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
+        ipv6_out=$($IP6TABLES_PATH -L PORT_OUT -nvx | grep -E "(spt:|sports[[:space:]]+)(${regex_part})\\b" | awk '{sum+=$2} END{print sum}')
 
         # 默认值设定，防止空值
         ipv4_in=${ipv4_in:-0}
